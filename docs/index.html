@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wrocław Weather Parser - Cloud Data Lake Ingestion Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.65);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary: #6366f1; /* Indigo */
+            --primary-glow: rgba(99, 102, 241, 0.15);
+            --secondary: #14b8a6; /* Teal */
+            --secondary-glow: rgba(20, 184, 166, 0.15);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --danger: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.1);
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            transition: all 0.25s ease;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Decorative animated glowing background blobs */
+        body::before, body::after {
+            content: "";
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            z-index: -1;
+            filter: blur(120px);
+            opacity: 0.35;
+            pointer-events: none;
+        }
+
+        body::before {
+            background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+            top: -100px;
+            right: -100px;
+            animation: float-slow 15s infinite alternate;
+        }
+
+        body::after {
+            background: radial-gradient(circle, var(--secondary) 0%, transparent 70%);
+            bottom: -100px;
+            left: -100px;
+            animation: float-slow 20s infinite alternate-reverse;
+        }
+
+        @keyframes float-slow {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(50px, 50px) scale(1.2); }
+        }
+
+        header {
+            max-width: 1100px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2.5rem 1.5rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-section h1 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 1.8rem;
+            letter-spacing: -0.05em;
+            background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 50%, #14b8a6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .badge-live {
+            background: rgba(20, 184, 166, 0.1);
+            border: 1px solid rgba(20, 184, 166, 0.3);
+            color: var(--secondary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-live span {
+            width: 6px;
+            height: 6px;
+            background-color: var(--secondary);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 8px var(--secondary);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(20, 184, 166, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(20, 184, 166, 0); }
+        }
+
+        main {
+            max-width: 1100px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1.5rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* Glassmorphic Card Style */
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 2rem;
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .glass-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.15) 0%, transparent 100%);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            pointer-events: none;
+        }
+
+        /* Config Panel */
+        .config-trigger {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 0.6rem 1.2rem;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .config-trigger:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .config-panel {
+            display: none;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) 100px;
+            gap: 1rem;
+            align-items: flex-end;
+            margin-bottom: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px dashed rgba(255, 255, 255, 0.05);
+        }
+
+        .config-panel.open {
+            display: grid;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .form-group label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-group input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 0.6rem 0.8rem;
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary-glow);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-primary:hover {
+            background: #4f46e5;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* Dashboard Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+        }
+
+        /* Weather Main Card */
+        .weather-hero {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.07) 0%, rgba(20, 184, 166, 0.07) 100%);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+
+        .weather-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 2rem;
+        }
+
+        .location-info h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 700;
+        }
+
+        .location-info p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-top: 0.2rem;
+        }
+
+        .weather-icon-container {
+            font-size: 4rem;
+            filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.1));
+            animation: bounce 4s infinite ease-in-out;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .weather-body {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .temp-val {
+            font-family: 'Outfit', sans-serif;
+            font-size: 5.5rem;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.03em;
+            background: linear-gradient(to bottom, #ffffff 60%, #e2e8f0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .temp-unit {
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: var(--text-muted);
+            align-self: flex-start;
+            margin-top: 0.5rem;
+        }
+
+        .weather-condition {
+            font-size: 1.3rem;
+            font-weight: 500;
+            color: var(--text-main);
+            margin-left: 0.5rem;
+            align-self: center;
+        }
+
+        .weather-details-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            border-top: 1px solid var(--card-border);
+            padding-top: 1.5rem;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .detail-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .detail-value {
+            font-size: 1.15rem;
+            font-weight: 600;
+        }
+
+        /* Pipeline Info Card */
+        .pipeline-info {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .pipeline-info h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pipeline-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+
+        .meta-label {
+            color: var(--text-muted);
+        }
+
+        .meta-val {
+            font-family: 'Fira Code', monospace;
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .meta-val a {
+            color: var(--secondary);
+            text-decoration: none;
+        }
+
+        .meta-val a:hover {
+            text-decoration: underline;
+        }
+
+        .architecture-flow {
+            margin-top: 1rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid var(--card-border);
+        }
+
+        .flow-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.6rem;
+        }
+
+        .flow-steps {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.75rem;
+        }
+
+        .flow-step {
+            background: rgba(255,255,255,0.05);
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            border: 1px solid var(--card-border);
+        }
+
+        .flow-arrow {
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+
+        /* Loading / Error States */
+        .status-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(11, 15, 25, 0.9);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            z-index: 10;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(99, 102, 241, 0.1);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s infinite linear;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-card {
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(11, 15, 25, 0.95) 100%);
+            display: none;
+            max-width: 600px;
+            margin: 2rem auto;
+            text-align: left;
+        }
+
+        .error-title {
+            color: var(--danger);
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .error-desc {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: var(--text-main);
+            margin-bottom: 1.5rem;
+        }
+
+        .instructions {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.8rem;
+        }
+
+        .instructions p {
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        .instructions ul {
+            padding-left: 1.2rem;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .code-block {
+            background: #000;
+            color: #a5b4fc;
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            margin-top: 0.3rem;
+            display: block;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        footer {
+            max-width: 1100px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+            border-top: 1px solid var(--card-border);
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        footer a {
+            color: var(--text-main);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            color: var(--primary);
+        }
+
+        @media (max-width: 600px) {
+            footer {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-section">
+            <h1><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/><circle cx="12" cy="12" r="4"/></svg> Weather Data Lake</h1>
+        </div>
+        <div class="header-actions">
+            <button class="config-trigger" onclick="toggleConfig()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Configure Bucket
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <!-- S3 Source Settings Configuration -->
+        <div id="config-panel" class="config-panel">
+            <div class="form-group">
+                <label for="bucket-input">S3 Bucket Name</label>
+                <input type="text" id="bucket-input" placeholder="wroclaw-weather-data-snisarenko">
+            </div>
+            <div class="form-group">
+                <label for="region-input">AWS Region</label>
+                <input type="text" id="region-input" placeholder="eu-central-1">
+            </div>
+            <div class="form-group">
+                <label for="prefix-input">S3 Key Prefix</label>
+                <input type="text" id="prefix-input" placeholder="weather/wroclaw/">
+            </div>
+            <button class="btn-primary" onclick="saveConfig()">Save & Fetch</button>
+        </div>
+
+        <!-- Ingestion Status & Weather Display -->
+        <div class="dashboard-grid">
+            
+            <!-- Weather Hero Card -->
+            <div class="glass-card weather-hero" id="weather-card">
+                
+                <!-- Loading State Overlay -->
+                <div id="loading-overlay" class="status-overlay">
+                    <div class="spinner"></div>
+                    <p>Fetching latest S3 weather state...</p>
+                </div>
+
+                <div class="weather-header">
+                    <div class="location-info">
+                        <h2 id="ui-city">Wrocław</h2>
+                        <p id="ui-country">Poland</p>
+                    </div>
+                    <div class="weather-icon-container" id="ui-icon">☀️</div>
+                </div>
+
+                <div>
+                    <div class="weather-body">
+                        <span class="temp-val" id="ui-temp">--.-</span>
+                        <span class="temp-unit">°C</span>
+                        <span class="weather-condition" id="ui-condition">Loading Data</span>
+                    </div>
+
+                    <div class="weather-details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Apparent Temp</span>
+                            <span class="detail-value" id="ui-apparent">--.- °C</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Relative Humidity</span>
+                            <span class="detail-value" id="ui-humidity">--%</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Wind Velocity</span>
+                            <span class="detail-value" id="ui-wind">--.- km/h</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ingestion Pipeline Metadata Card -->
+            <div class="glass-card pipeline-info">
+                <h3>Pipeline Status <div class="badge-live"><span></span>pipeline active</div></h3>
+                
+                <div class="pipeline-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">Data Ingest Source</span>
+                        <span class="meta-val"><a href="https://open-meteo.com" target="_blank">Open-Meteo API</a></span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Coordinates</span>
+                        <span class="meta-val" id="ui-coords">51.11°N, 17.04°E</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Last S3 Ingestion</span>
+                        <span class="meta-val" id="ui-fetched">--:--:--</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">S3 Resource Type</span>
+                        <span class="meta-val" style="color: var(--secondary)">JSON Document</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">S3 Target Object</span>
+                        <span class="meta-val" id="ui-target-file" style="font-size: 0.8rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 180px;">weather/wroclaw/latest.json</span>
+                    </div>
+                </div>
+
+                <div class="architecture-flow">
+                    <div class="flow-title">Pipeline Architecture</div>
+                    <div class="flow-steps">
+                        <span class="flow-step">API</span>
+                        <span class="flow-arrow">→</span>
+                        <span class="flow-step">GitHub Actions</span>
+                        <span class="flow-arrow">→</span>
+                        <span class="flow-step">AWS S3</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Big Error Panel (Displayed if fetching fails due to CORS or Access Denied) -->
+        <div class="glass-card error-card" id="error-panel">
+            <div class="error-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/></svg>
+                Ingestion Read Failed (CORS/Public Access)
+            </div>
+            <p class="error-desc" id="error-message">
+                Could not fetch weather data from AWS S3 bucket. This usually happens because CORS is not configured, public access is blocked, or the S3 bucket does not exist.
+            </p>
+            <div class="instructions">
+                <p>🔧 Quick Resolution Instructions:</p>
+                <ul>
+                    <li>
+                        <strong>1. Enable CORS on your S3 Bucket:</strong> Go to S3 console &rarr; <i>Permissions</i> &rarr; <i>Cross-origin resource sharing (CORS)</i> and paste:
+                        <code class="code-block">[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET"],
+    "AllowedOrigins": ["*"],
+    "ExposeHeaders": []
+  }
+]</code>
+                    </li>
+                    <li>
+                        <strong>2. Allow Public Read Access:</strong> Ensure S3 "Block public access" is turned off, and configure this bucket policy to allow public reads on the latest file:
+                        <code class="code-block" id="ui-policy-code">{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadLatest",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::<your-bucket>/weather/wroclaw/latest.json"
+    }
+  ]
+}</code>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div>Serverless Ingestion Pipeline Project</div>
+        <div>
+            <a href="https://github.com" target="_blank" id="ui-github-link">View Portfolio GitHub Repository</a>
+        </div>
+    </footer>
+
+    <script>
+        // Default Configs
+        const defaults = {
+            bucket: "wroclaw-weather-data-snisarenko",
+            region: "eu-central-1",
+            prefix: "weather/wroclaw/"
+        };
+
+        // Load configs from LocalStorage or use defaults
+        let config = {
+            bucket: localStorage.getItem("s3_bucket") || defaults.bucket,
+            region: localStorage.getItem("s3_region") || defaults.region,
+            prefix: localStorage.getItem("s3_prefix") || defaults.prefix
+        };
+
+        // Initialize Form Values
+        document.getElementById("bucket-input").value = config.bucket;
+        document.getElementById("region-input").value = config.region;
+        document.getElementById("prefix-input").value = config.prefix;
+
+        function toggleConfig() {
+            const panel = document.getElementById("config-panel");
+            panel.classList.toggle("open");
+        }
+
+        function saveConfig() {
+            config.bucket = document.getElementById("bucket-input").value.trim() || defaults.bucket;
+            config.region = document.getElementById("region-input").value.trim() || defaults.region;
+            config.prefix = document.getElementById("prefix-input").value.trim() || defaults.prefix;
+
+            localStorage.setItem("s3_bucket", config.bucket);
+            localStorage.setItem("s3_region", config.region);
+            localStorage.setItem("s3_prefix", config.prefix);
+
+            toggleConfig();
+            fetchWeatherData();
+        }
+
+        // Map WMO Weather Codes to emojis & human-friendly names
+        function getWeatherDetails(code) {
+            const map = {
+                0: { condition: "Clear sky", icon: "☀️" },
+                1: { condition: "Mainly clear", icon: "🌤️" },
+                2: { condition: "Partly cloudy", icon: "⛅" },
+                3: { condition: "Overcast", icon: "☁️" },
+                45: { condition: "Foggy", icon: "🌫️" },
+                48: { condition: "Depositing rime fog", icon: "🌫️" },
+                51: { condition: "Light drizzle", icon: "🌧️" },
+                53: { condition: "Moderate drizzle", icon: "🌧️" },
+                55: { condition: "Dense drizzle", icon: "🌧️" },
+                56: { condition: "Light freezing drizzle", icon: "🌨️" },
+                57: { condition: "Dense freezing drizzle", icon: "🌨️" },
+                61: { condition: "Slight rain", icon: "🌧️" },
+                63: { condition: "Moderate rain", icon: "🌧️" },
+                65: { condition: "Heavy rain", icon: "🌧️" },
+                66: { condition: "Light freezing rain", icon: "🌨️" },
+                67: { condition: "Heavy freezing rain", icon: "🌨️" },
+                71: { condition: "Slight snowfall", icon: "❄️" },
+                73: { condition: "Moderate snowfall", icon: "❄️" },
+                75: { condition: "Heavy snowfall", icon: "❄️" },
+                77: { condition: "Snow grains", icon: "❄️" },
+                80: { condition: "Slight rain showers", icon: "🌧️" },
+                81: { condition: "Moderate rain showers", icon: "🌧️" },
+                82: { condition: "Violent rain showers", icon: "⛈️" },
+                85: { condition: "Slight snow showers", icon: "❄️" },
+                86: { condition: "Heavy snow showers", icon: "❄️" },
+                95: { condition: "Thunderstorm", icon: "⚡" },
+                96: { condition: "Thunderstorm with slight hail", icon: "⛈️" },
+                99: { condition: "Thunderstorm with heavy hail", icon: "⛈️" }
+            };
+            return map[code] || { condition: "Unknown Weather Code", icon: "🌡️" };
+        }
+
+        async function fetchWeatherData() {
+            const loadingOverlay = document.getElementById("loading-overlay");
+            const errorPanel = document.getElementById("error-panel");
+            const weatherCard = document.getElementById("weather-card");
+
+            loadingOverlay.style.display = "flex";
+            errorPanel.style.display = "none";
+
+            // Update UI elements representing targets
+            document.getElementById("ui-target-file").textContent = `${config.prefix}latest.json`;
+            
+            // Construct Bucket URL
+            const url = `https://${config.bucket}.s3.${config.region}.amazonaws.com/${config.prefix}latest.json`;
+            
+            // Build bucket policy code preview in case of failure
+            const policyCode = `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadLatest",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::${config.bucket}/${config.prefix}latest.json"
+    }
+  ]
+}`;
+            document.getElementById("ui-policy-code").textContent = policyCode;
+
+            try {
+                // Fetch latest file with a cache buster to guarantee fresh data
+                const response = await fetch(`${url}?_cb=${new Date().getTime()}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP Error status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Update UI from weather data payload
+                document.getElementById("ui-city").textContent = data.city || "Wrocław";
+                document.getElementById("ui-country").textContent = data.country || "Poland";
+                
+                const coords = data.coordinates;
+                if (coords) {
+                    document.getElementById("ui-coords").textContent = `${coords.latitude.toFixed(2)}°N, ${coords.longitude.toFixed(2)}°E`;
+                }
+
+                const fetchedAt = new Date(data.fetched_at);
+                document.getElementById("ui-fetched").textContent = fetchedAt.toLocaleString();
+
+                const weather = data.weather;
+                if (weather && weather.current) {
+                    const curr = weather.current;
+                    document.getElementById("ui-temp").textContent = curr.temperature_2m.toFixed(1);
+                    document.getElementById("ui-apparent").textContent = `${curr.apparent_temperature.toFixed(1)} °C`;
+                    document.getElementById("ui-humidity").textContent = `${curr.relative_humidity_2m}%`;
+                    document.getElementById("ui-wind").textContent = `${curr.wind_speed_10m.toFixed(1)} km/h`;
+
+                    const condDetails = getWeatherDetails(curr.weather_code);
+                    document.getElementById("ui-condition").textContent = condDetails.condition;
+                    document.getElementById("ui-icon").textContent = condDetails.icon;
+                }
+
+                // Hide loading overlay
+                loadingOverlay.style.display = "none";
+            } catch (err) {
+                console.error("Fetch weather state failed: ", err);
+                loadingOverlay.style.display = "none";
+                errorPanel.style.display = "block";
+                
+                // Set placeholder values
+                document.getElementById("ui-temp").textContent = "--.-";
+                document.getElementById("ui-condition").textContent = "Read Error";
+                document.getElementById("ui-icon").textContent = "❌";
+            }
+        }
+
+        // Initialize Fetch
+        fetchWeatherData();
+    </script>
+</body>
+</html>
