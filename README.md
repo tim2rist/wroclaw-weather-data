@@ -1,6 +1,8 @@
 # Serverless Cloud Weather Ingestion Pipeline & Dashboard
 
-A production-ready serverless data ingestion pipeline that fetches weather data daily for Wrocław, Poland, stores it in an AWS S3 data lake, and visualizes it via a live glassmorphic web dashboard hosted on GitHub Pages.
+🔗 **Live Weather Dashboard**: [wroclaw-weather-data.vercel.app](https://wroclaw-weather-data.vercel.app)
+
+A production-ready serverless data ingestion pipeline that fetches weather data daily for Wrocław, Poland, stores it in an AWS S3 data lake, and visualizes it via a live glassmorphic web dashboard hosted on Vercel (or GitHub Pages).
 
 Designed to demonstrate cloud architecture best practices, automated ETL pipelines, credential security, and static site integration with AWS S3.
 
