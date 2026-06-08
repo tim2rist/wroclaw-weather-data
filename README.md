@@ -113,7 +113,11 @@ Go to your AWS Console &rarr; S3 &rarr; Your Bucket &rarr; **Permissions** &rarr
     {
         "AllowedHeaders": ["*"],
         "AllowedMethods": ["GET"],
-        "AllowedOrigins": ["https://*.github.io", "http://localhost:*"],
+        "AllowedOrigins": [
+            "https://*.github.io",
+            "https://*.vercel.app",
+            "http://localhost:*"
+        ],
         "ExposeHeaders": []
     }
 ]
